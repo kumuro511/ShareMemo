@@ -42,20 +42,21 @@ public class MainActivity extends Activity {
 		
 		mDbAdapter = new DBAdapter(this);
 		
-		List<SelectableNote> noteList = new ArrayList<SelectableNote>();
-		mNoteAdapter = new NoteAdapter(this, 0, noteList);
-		loadNote();
-		if (mNoteAdapter.getCount() == 0) {
-			createNewNote();
-		}
 		
 		initEditText();
 		initListView();
 		initAddButton();
 		initDelButton();
 		
-		// 最初は一番上のノートが選択される
-		setNewNote(mNoteAdapter.getItem(0));
+		loadNote();
+		if (mNoteAdapter.getCount() == 0) {
+			// ノートがない時は編集不可
+			setNoteEditable(false);
+			mEditingNote = null;
+		} else {
+			// 最初は一番上のノートが選択される
+			setNewNote(mNoteAdapter.getItem(0));
+		}
 		refleshListView();
 	}
 
@@ -105,6 +106,8 @@ public class MainActivity extends Activity {
 	
 	private void initListView() {
 		// ListViewの中身はadapterごしに管理する
+		List<SelectableNote> noteList = new ArrayList<SelectableNote>();
+		mNoteAdapter = new NoteAdapter(this, 0, noteList);
 		mItemListView = (ListView) findViewById(R.id.note_list);
 		mItemListView.setAdapter(mNoteAdapter);
 	
@@ -129,6 +132,8 @@ public class MainActivity extends Activity {
 			
 			@Override
 			public void onClick(View v) {
+				// ノートが少なくとも一つあるので編集可
+				setNoteEditable(true);
 				// ボタンが押されたら新しいノートを作成する
 				SelectableNote newNote = createNewNote();
 				changeSelectedNote(newNote);
@@ -149,8 +154,10 @@ public class MainActivity extends Activity {
 	}
 	
 	private void changeSelectedNote(SelectableNote newNote) {
-		// 編集中のNoteの内容を保存します
-		savePrevNote();
+		if (mEditingNote != null) {
+			// 編集中のNoteの内容を保存します
+			savePrevNote();
+		}
 		// 新しいノートをセットします
 		setNewNote(newNote);
         
@@ -229,21 +236,33 @@ public class MainActivity extends Activity {
 		
 		int position = mNoteAdapter.getPosition(mEditingNote);
 		mNoteAdapter.remove(mEditingNote);
+		mEditingNote = null;
+		
 		SelectableNote newNote;
 		if (mNoteAdapter.getCount() == 0) {
-			newNote = createNewNote();
+			setNoteEditable(false);
+			mIsEditWithChangeNote = true;
+			mNoteEditText.setText("");
+			mIsEditWithChangeNote = false;
 		} else {
 			if (position < mNoteAdapter.getCount()) {
 				newNote = mNoteAdapter.getItem(position);
 			} else {
 				newNote = mNoteAdapter.getItem(position - 1);
 			}
+			setNewNote(newNote);
 		}
-		setNewNote(newNote);
 	}
 	
 	private void refleshListView() {
 		mNoteAdapter.sort(new NoteComparator());
 		mNoteAdapter.notifyDataSetChanged();
+	}
+	
+	private void setNoteEditable(boolean isEditable) {
+		mNoteEditText.setFocusable(isEditable);
+		mNoteEditText.setFocusableInTouchMode(isEditable);
+		mNoteEditText.setEnabled(isEditable);
+		mNoteEditText.requestFocus();
 	}
 }
