@@ -1,7 +1,9 @@
 package jp.ac.titech.itpro.sdl.yamamoto.sharememo;
 
 import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Locale;
 
 import android.content.ContentValues;
 import android.content.Context;
@@ -78,18 +80,29 @@ public class DBAdapter {
 	public boolean deleteNote(int id) {
 		return db.delete(TABLE_NAME, COL_ID + "=" + id, null) > 0;
 	}
+	
+	public Cursor getNote(int id) {
+		return db.query(TABLE_NAME, null, "where _id=" + id, null, null, null, null);
+	}
 
 	public Cursor getAllNotes() {
 		return db.query(TABLE_NAME, null, null, null, null, null, null);
 	}
 
-	public void saveNote(String note, String user) {
-		Date dateNow = new Date();
-		DateFormat format = DateFormat.getInstance();
+	public int saveNote(String note, String user) {
 		ContentValues values = new ContentValues();
 		values.put(COL_NOTE, note);
 		values.put(COL_USER, user);
-		values.put(COL_LASTUPDATE, format.format(dateNow));
-		db.insertOrThrow(TABLE_NAME, null, values);
+		values.put(COL_LASTUPDATE, DateUtils.getDate());
+		return (int) db.insertOrThrow(TABLE_NAME, null, values);
+	}
+	
+	public void updateNote(Note note) {
+		ContentValues values = new ContentValues();
+		values.put(COL_NOTE, note.getNote());
+		values.put(COL_USER, note.getUser());
+		values.put(COL_LASTUPDATE, note.getLastupdate());
+		String whereClause = COL_ID + "=" + note.getId();
+		db.update(TABLE_NAME, values, whereClause, null);
 	}
 }
