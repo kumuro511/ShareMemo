@@ -15,6 +15,7 @@ import android.view.Menu;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 
@@ -23,11 +24,11 @@ public class MainActivity extends Activity {
 	
 	private EditText mNoteEditText;
 	private ListView mItemListView;
+	private Button mAddButton;
 
 	private SelectableNote mEditingNote;
-	private int mEditingPosition;
 	private boolean mIsNoteEdited;
-	private boolean mIsEditWithClick;
+	private boolean mIsEditWithChangeNote;
 	
 	private DBAdapter mDbAdapter;
 	private NoteAdapter mNoteAdapter;
@@ -39,17 +40,21 @@ public class MainActivity extends Activity {
 		setContentView(R.layout.activity_main);
 		
 		mDbAdapter = new DBAdapter(this);
-		initEditText();
-		initListView();
-		loadNote();
 		
+		List<SelectableNote> noteList = new ArrayList<SelectableNote>();
+		mNoteAdapter = new NoteAdapter(this, 0, noteList);
+		loadNote();
 		if (mNoteAdapter.getCount() == 0) {
 			createNewNote();
 		}
+		
+		initEditText();
+		initListView();
+		initAddButton();
+		
 		// 最初は一番上のノートが選択される
-		mEditingPosition = 0;
-		mEditingNote = mNoteAdapter.getItem(mEditingPosition);
-        setEditText();
+		setNewNote(mNoteAdapter.getItem(0));
+		refleshListView();
 	}
 
 	@Override
@@ -73,7 +78,7 @@ public class MainActivity extends Activity {
 
 			@Override
 			public void afterTextChanged(Editable s) {
-				if (!mIsEditWithClick) {
+				if (!mIsEditWithChangeNote) {
 					// ノートを更新する
 					mEditingNote.setNote(mNoteEditText.getText().toString());
 					mEditingNote.setLastupdate(DateUtils.getDate());
@@ -98,8 +103,6 @@ public class MainActivity extends Activity {
 	
 	private void initListView() {
 		// ListViewの中身はadapterごしに管理する
-		List<SelectableNote> noteList = new ArrayList<SelectableNote>();
-		mNoteAdapter = new NoteAdapter(this, 0, noteList);
 		mItemListView = (ListView) findViewById(R.id.note_list);
 		mItemListView.setAdapter(mNoteAdapter);
 	
@@ -108,27 +111,52 @@ public class MainActivity extends Activity {
 			@Override
 			public void onItemClick(AdapterView<?> parent, View view, int position,
 					long id) {
-				 // Noteの内容を保存します
-				if (mIsNoteEdited) {
-					updateNote(mEditingNote);
-				}
-				mEditingNote.setIsSelected(false);
-                mIsEditWithClick = true;
 				// クリックされたアイテムを取得します
 				ListView listView = (ListView) parent;
-                mEditingNote = (SelectableNote) listView.getItemAtPosition(position);
-                setEditText();
-                mIsEditWithClick = false;
-                
+                SelectableNote item = (SelectableNote) listView.getItemAtPosition(position);
+                // クリックされたノートに切り替えます
+                changeSelectedNote(item);
                 refleshListView();
 			}
 		});
 	}
 	
-	private void setEditText() {
+	private void initAddButton() {
+		mAddButton = (Button) findViewById(R.id.add_button);
+		mAddButton.setOnClickListener(new View.OnClickListener() {
+			
+			@Override
+			public void onClick(View v) {
+				// ボタンが押されたら新しいノートを作成する
+				SelectableNote newNote = createNewNote();
+				changeSelectedNote(newNote);
+			}
+		});
+	}
+	
+	private void changeSelectedNote(SelectableNote newNote) {
+		// 編集中のNoteの内容を保存します
+		savePrevNote();
+		// 新しいノートをセットします
+		setNewNote(newNote);
+        
+        refleshListView();
+	}
+	
+	private void savePrevNote() {
+		if (mIsNoteEdited) {
+			updateNote(mEditingNote);
+		}
+		mEditingNote.setIsSelected(false);	
+	}
+	
+	private void setNewNote(SelectableNote newNote) {
+		mIsEditWithChangeNote = true;
+        mEditingNote = newNote;
         mNoteEditText.setText(mEditingNote.getNote());
 		mEditingNote.setIsSelected(true);
         mIsNoteEdited = false;
+        mIsEditWithChangeNote = false;
 	}
 	
 	private SelectableNote getNote(Cursor c) {
@@ -156,20 +184,22 @@ public class MainActivity extends Activity {
 			} while (c.moveToNext());
 		}
 		mDbAdapter.close();
-		
-		refleshListView();
 	}
 
-	private void createNewNote() {
-		SelectableNote note;
+	private SelectableNote createNewNote() {
+		SelectableNote note = null;
 		mDbAdapter.open();
 		int id = mDbAdapter.saveNote("", "user");
-		Cursor c = mDbAdapter.getNote(id);
-		note = getNote(c);
 		mDbAdapter.close();
+		System.err.println(id);
+		mDbAdapter.open();
+		Cursor c = mDbAdapter.getNote(id);
+		if (c.moveToFirst()) {
+			note = getNote(c);
+			mNoteAdapter.add(note);
+		}
 		
-		mNoteAdapter.add(note);
-		refleshListView();
+		return note;
 	}
 	
 	private void updateNote(Note note) {
@@ -179,7 +209,7 @@ public class MainActivity extends Activity {
 	}
 	
 	private void refleshListView() {
-		mNoteAdapter.notifyDataSetChanged();
 		mNoteAdapter.sort(new NoteComparator());
+		mNoteAdapter.notifyDataSetChanged();
 	}
 }

@@ -33,7 +33,8 @@ public class NoteAdapter extends ArrayAdapter<SelectableNote> {
 		 
 		 TextView textView1;
 		 textView1 = (TextView) convertView.findViewById(R.id.text_str);
-		 textView1.setText(item.getNote().substring(0, STR_LENGTH));
+		 int length = Math.min(STR_LENGTH, item.getNote().length());
+		 textView1.setText(item.getNote().substring(0, length));
 		 
 		 TextView textView2;
 		 textView2 = (TextView) convertView.findViewById(R.id.text_date);

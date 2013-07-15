@@ -1,10 +1,5 @@
 package jp.ac.titech.itpro.sdl.yamamoto.sharememo;
 
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
-
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
@@ -82,7 +77,9 @@ public class DBAdapter {
 	}
 	
 	public Cursor getNote(int id) {
-		return db.query(TABLE_NAME, null, "where _id=" + id, null, null, null, null);
+		String query = "select * from " + TABLE_NAME + " where " + COL_ID + "=" + id + ";";
+		System.err.println(query);
+		return db.rawQuery(query, null);
 	}
 
 	public Cursor getAllNotes() {
