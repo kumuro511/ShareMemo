@@ -28,13 +28,14 @@ public final class R {
         public static final int ic_launcher=0x7f020000;
     }
     public static final class id {
-        public static final int action_settings=0x7f090006;
+        public static final int action_settings=0x7f090007;
         public static final int add_button=0x7f090002;
+        public static final int del_button=0x7f090003;
         public static final int note_list=0x7f090001;
-        public static final int note_text=0x7f090003;
+        public static final int note_text=0x7f090004;
         public static final int search_window=0x7f090000;
-        public static final int text_date=0x7f090005;
-        public static final int text_str=0x7f090004;
+        public static final int text_date=0x7f090006;
+        public static final int text_str=0x7f090005;
     }
     public static final class layout {
         public static final int activity_main=0x7f030000;

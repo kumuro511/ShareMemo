@@ -25,6 +25,7 @@ public class MainActivity extends Activity {
 	private EditText mNoteEditText;
 	private ListView mItemListView;
 	private Button mAddButton;
+	private Button mDelButton;
 
 	private SelectableNote mEditingNote;
 	private boolean mIsNoteEdited;
@@ -51,6 +52,7 @@ public class MainActivity extends Activity {
 		initEditText();
 		initListView();
 		initAddButton();
+		initDelButton();
 		
 		// 最初は一番上のノートが選択される
 		setNewNote(mNoteAdapter.getItem(0));
@@ -134,6 +136,18 @@ public class MainActivity extends Activity {
 		});
 	}
 	
+	private void initDelButton() {
+		mDelButton = (Button) findViewById(R.id.del_button);
+		mDelButton.setOnClickListener(new View.OnClickListener() {
+			
+			@Override
+			public void onClick(View v) {
+				// ボタンが押されたら現在のノートを削除する
+				deleteNote(mEditingNote);
+			}
+		});
+	}
+	
 	private void changeSelectedNote(SelectableNote newNote) {
 		// 編集中のNoteの内容を保存します
 		savePrevNote();
@@ -206,6 +220,26 @@ public class MainActivity extends Activity {
 		mDbAdapter.open();
 		mDbAdapter.updateNote(note);
 		mDbAdapter.close();
+	}
+	
+	private void deleteNote(Note note) {
+		mDbAdapter.open();
+		mDbAdapter.deleteNote(note.getId());
+		mDbAdapter.close();
+		
+		int position = mNoteAdapter.getPosition(mEditingNote);
+		mNoteAdapter.remove(mEditingNote);
+		SelectableNote newNote;
+		if (mNoteAdapter.getCount() == 0) {
+			newNote = createNewNote();
+		} else {
+			if (position < mNoteAdapter.getCount()) {
+				newNote = mNoteAdapter.getItem(position);
+			} else {
+				newNote = mNoteAdapter.getItem(position - 1);
+			}
+		}
+		setNewNote(newNote);
 	}
 	
 	private void refleshListView() {
