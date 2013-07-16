@@ -1,5 +1,6 @@
 package jp.ac.titech.itpro.sdl.yamamoto.sharememo;
 
+@SuppressWarnings("serial")
 public class SelectableNote extends Note {
 	private boolean isSelected;
 
@@ -7,7 +8,7 @@ public class SelectableNote extends Note {
 		super(id, note, user, lastupdate);
 		this.setIsSelected(false);
 	}
-
+	
 	public void setIsSelected(boolean isSelected) {
 		this.isSelected = isSelected;
 	}

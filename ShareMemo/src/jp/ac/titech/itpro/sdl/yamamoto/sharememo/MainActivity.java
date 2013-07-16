@@ -1,16 +1,31 @@
 package jp.ac.titech.itpro.sdl.yamamoto.sharememo;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+import android.nfc.NdefMessage;
+import android.nfc.NdefRecord;
+import android.nfc.NfcAdapter;
+import android.nfc.NfcAdapter.CreateNdefMessageCallback;
+import android.nfc.NfcAdapter.OnNdefPushCompleteCallback;
+import android.nfc.NfcEvent;
 import android.os.Bundle;
+import android.os.Parcelable;
 import android.app.Activity;
+import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteCursor;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.Menu;
 import android.view.View;
 import android.widget.AdapterView;
@@ -19,7 +34,8 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements CreateNdefMessageCallback,
+	OnNdefPushCompleteCallback {
 	static final int MENUITEM_ID_DELETE = 1;
 	
 	private EditText mNoteEditText;
@@ -33,6 +49,9 @@ public class MainActivity extends Activity {
 	
 	private DBAdapter mDbAdapter;
 	private NoteAdapter mNoteAdapter;
+
+	private NfcAdapter mNfcAdapter;
+
 	
 	
 	@Override
@@ -41,7 +60,6 @@ public class MainActivity extends Activity {
 		setContentView(R.layout.activity_main);
 		
 		mDbAdapter = new DBAdapter(this);
-		
 		
 		initEditText();
 		initListView();
@@ -58,6 +76,13 @@ public class MainActivity extends Activity {
 			setNewNote(mNoteAdapter.getItem(0));
 		}
 		refleshListView();
+		
+		// android beam
+		mNfcAdapter = NfcAdapter.getDefaultAdapter(this);
+		if (mNfcAdapter != null) {
+			mNfcAdapter.setNdefPushMessageCallback(this, this);
+			mNfcAdapter.setOnNdefPushCompleteCallback(this, this);
+		}
 	}
 
 	@Override
@@ -75,6 +100,40 @@ public class MainActivity extends Activity {
 		}
 	}
 	
+	@Override
+	public void onResume() {
+		super.onResume();
+        // Check to see that the Activity started due to an Android Beam
+        if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(getIntent().getAction())) {
+            processIntent(getIntent());
+        }
+    }
+	private void processIntent(Intent intent) {
+        Parcelable[] rawMsgs = intent.getParcelableArrayExtra(
+                NfcAdapter.EXTRA_NDEF_MESSAGES);
+        // only one message sent during the beam
+        NdefMessage msg = (NdefMessage) rawMsgs[0];
+        
+        byte[] data = msg.getRecords()[0].getPayload();
+
+        try {
+	        ByteArrayInputStream bis = new ByteArrayInputStream(data);
+	        // これを入力元とするDataOutputStreamクラスを作ります。
+	        ObjectInputStream ois = new ObjectInputStream(bis);
+	
+	        // データを取り出して保存、そのノートに切り替えます。
+	        SelectableNote newNote = (SelectableNote) ois.readObject();
+	        saveNote(newNote.getNote(), newNote.getUser());
+			changeSelectedNote(newNote);
+	        
+			// 少なくとも一つノートがあるの編集可
+			setNoteEditable(true);
+	        
+        } catch (Exception e) {
+        	Log.d("DEBUG", "deserialize fail");
+        }        
+	}
+	
 	private void initEditText() {
 		mNoteEditText = (EditText) findViewById(R.id.note_text);
 		mNoteEditText.addTextChangedListener(new TextWatcher() {
@@ -90,17 +149,14 @@ public class MainActivity extends Activity {
 					refleshListView();
 				}
 			}
-
 			@Override
 			public void beforeTextChanged(CharSequence s, int start, int count,
 					int after) {
 			}
-
 			@Override
 			public void onTextChanged(CharSequence s, int start, int before,
 					int count) {
 			}
-			
 		});
 	}
 	
@@ -207,10 +263,10 @@ public class MainActivity extends Activity {
 		mDbAdapter.close();
 	}
 
-	private SelectableNote createNewNote() {
+	private SelectableNote saveNote(String notetext, String user) {
 		SelectableNote note = null;
 		mDbAdapter.open();
-		int id = mDbAdapter.saveNote("", "user");
+		int id = mDbAdapter.saveNote(notetext, user);
 		mDbAdapter.close();
 		System.err.println(id);
 		mDbAdapter.open();
@@ -219,8 +275,10 @@ public class MainActivity extends Activity {
 			note = getNote(c);
 			mNoteAdapter.add(note);
 		}
-		
 		return note;
+	}
+	private SelectableNote createNewNote() {
+		return saveNote("", "user");
 	}
 	
 	private void updateNote(Note note) {
@@ -264,5 +322,30 @@ public class MainActivity extends Activity {
 		mNoteEditText.setFocusableInTouchMode(isEditable);
 		mNoteEditText.setEnabled(isEditable);
 		mNoteEditText.requestFocus();
+	}
+	
+
+	@Override
+	public void onNdefPushComplete(NfcEvent event) {
+		Log.d("DEBUG", "onNdefComplete");
+	}
+
+	@Override
+	public NdefMessage createNdefMessage(NfcEvent event) {
+		NdefMessage msg = null;
+		byte[] data;
+		try { 
+			ByteArrayOutputStream bos = new ByteArrayOutputStream();
+		    ObjectOutputStream oos = new ObjectOutputStream(bos);
+		    oos.writeObject(mEditingNote);
+		    oos.flush();
+		    data = bos.toByteArray();
+		    
+			msg = new NdefMessage(NdefRecord.createMime(
+					"application/jp.ac.titech.itpro.sdl.yamamoto.sharememo", data));
+		} catch (Exception e) {
+			Log.d("DEBUG", "serialize fail");
+		}
+		return msg;
 	}
 }

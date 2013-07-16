@@ -1,6 +1,9 @@
 package jp.ac.titech.itpro.sdl.yamamoto.sharememo;
 
-public class Note {
+import java.io.Serializable;
+
+@SuppressWarnings("serial")
+public class Note implements Serializable {
 	private int id;
 	private String note;
 	private String user;
