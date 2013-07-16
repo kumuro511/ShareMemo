@@ -22,12 +22,13 @@
         <ListView
             android:id="@+id/note_list"
             android:layout_width="match_parent"
-            android:layout_height="372dp" >
+            android:layout_height="0dip"
+            android:layout_weight="1" >
         </ListView>
 
         <LinearLayout 
             android:layout_width="match_parent"
-            android:layout_height="match_parent">
+            android:layout_height="wrap_content">
             
             <Button
 	            android:id="@+id/add_button"
@@ -46,14 +47,20 @@
 
     </LinearLayout>
 
-    <EditText
-        android:id="@+id/note_text"
+    <ScrollView 
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:inputType="textMultiLine" >
-
-        <requestFocus />
-    </EditText>
+        android:layout_height="match_parent"
+        android:layout_weight="1">
+	    <jp.ac.titech.itpro.sdl.yamamoto.sharememo.LinedEditText
+	        android:id="@+id/note_text"
+	        android:layout_gravity="top"
+	        android:layout_width="match_parent"
+	        android:layout_height="wrap_content"
+	        android:inputType="textMultiLine" 
+	        android:background="#00000000">
+	
+	        <requestFocus />
+	    </jp.ac.titech.itpro.sdl.yamamoto.sharememo.LinedEditText>
+    </ScrollView>
 
 </LinearLayout>

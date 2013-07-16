@@ -28,6 +28,7 @@ import android.text.TextWatcher;
 import android.util.Log;
 import android.view.Menu;
 import android.view.View;
+import android.view.ViewGroup.LayoutParams;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -38,7 +39,7 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 	OnNdefPushCompleteCallback {
 	static final int MENUITEM_ID_DELETE = 1;
 	
-	private EditText mNoteEditText;
+	private LinedEditText mNoteEditText;
 	private ListView mItemListView;
 	private Button mAddButton;
 	private Button mDelButton;
@@ -135,7 +136,7 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 	}
 	
 	private void initEditText() {
-		mNoteEditText = (EditText) findViewById(R.id.note_text);
+		mNoteEditText = (LinedEditText) findViewById(R.id.note_text);
 		mNoteEditText.addTextChangedListener(new TextWatcher() {
 
 			@Override
