@@ -19,11 +19,14 @@ import android.nfc.NfcAdapter.OnNdefPushCompleteCallback;
 import android.nfc.NfcEvent;
 import android.os.Bundle;
 import android.os.Parcelable;
+import android.accounts.Account;
+import android.accounts.AccountManager;
 import android.app.Activity;
 import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteCursor;
 import android.text.Editable;
+import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.view.Menu;
@@ -33,13 +36,15 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Filter.FilterListener;
 import android.widget.ListView;
+import android.widget.SearchView;
 
 public class MainActivity extends Activity implements CreateNdefMessageCallback,
-	OnNdefPushCompleteCallback {
+	OnNdefPushCompleteCallback, FilterListener {
 	static final int MENUITEM_ID_DELETE = 1;
 	
-	private LinedEditText mNoteEditText;
+	private EditText mNoteEditText;
 	private ListView mItemListView;
 	private Button mAddButton;
 	private Button mDelButton;
@@ -66,15 +71,15 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 		initListView();
 		initAddButton();
 		initDelButton();
+		initSearch();
 		
 		loadNote();
 		if (mNoteAdapter.getCount() == 0) {
-			// ノートがない時は編集不可
-			setNoteEditable(false);
 			mEditingNote = null;
+			deselectNote();
 		} else {
 			// 最初は一番上のノートが選択される
-			setNewNote(mNoteAdapter.getItem(0));
+			selectNote(mNoteAdapter.getItem(0));
 		}
 		refleshListView();
 		
@@ -119,16 +124,12 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 
         try {
 	        ByteArrayInputStream bis = new ByteArrayInputStream(data);
-	        // これを入力元とするDataOutputStreamクラスを作ります。
 	        ObjectInputStream ois = new ObjectInputStream(bis);
 	
 	        // データを取り出して保存、そのノートに切り替えます。
 	        SelectableNote newNote = (SelectableNote) ois.readObject();
 	        saveNote(newNote.getNote(), newNote.getUser());
-			changeSelectedNote(newNote);
-	        
-			// 少なくとも一つノートがあるの編集可
-			setNoteEditable(true);
+	        selectNote(newNote);
 	        
         } catch (Exception e) {
         	Log.d("DEBUG", "deserialize fail");
@@ -136,7 +137,8 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 	}
 	
 	private void initEditText() {
-		mNoteEditText = (LinedEditText) findViewById(R.id.note_text);
+		mNoteEditText = (EditText) findViewById(R.id.note_text);
+		mNoteEditText.requestFocus();
 		mNoteEditText.addTextChangedListener(new TextWatcher() {
 
 			@Override
@@ -173,12 +175,10 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 			@Override
 			public void onItemClick(AdapterView<?> parent, View view, int position,
 					long id) {
-				// クリックされたアイテムを取得します
+				// クリックされたアイテムを取得し、そのノートを選択します
 				ListView listView = (ListView) parent;
                 SelectableNote item = (SelectableNote) listView.getItemAtPosition(position);
-                // クリックされたノートに切り替えます
-                changeSelectedNote(item);
-                refleshListView();
+                selectNote(item);
 			}
 		});
 	}
@@ -189,11 +189,9 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 			
 			@Override
 			public void onClick(View v) {
-				// ノートが少なくとも一つあるので編集可
-				setNoteEditable(true);
-				// ボタンが押されたら新しいノートを作成する
+				// ボタンが押されたら新しいノートを作成し、選択する
 				SelectableNote newNote = createNewNote();
-				changeSelectedNote(newNote);
+				selectNote(newNote);
 			}
 		});
 	}
@@ -210,36 +208,40 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 		});
 	}
 	
-	private void changeSelectedNote(SelectableNote newNote) {
-		if (mEditingNote != null) {
-			// 編集中のNoteの内容を保存します
-			savePrevNote();
-		}
-		// 新しいノートをセットします
-		setNewNote(newNote);
-        
-        refleshListView();
+	private void initSearch() {
+		// search window
+		SearchView search =	(SearchView) findViewById(R.id.search_window);
+		search.setIconified(false);	
+		search.setSubmitButtonEnabled(false);
+		search.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+			@Override
+			public boolean onQueryTextSubmit(String query) {
+				Log.d("DEBUG", "test");
+				return false;
+			}
+			@Override
+			public boolean onQueryTextChange(String queryText) {
+				if (TextUtils.isEmpty(queryText)) {
+					mNoteAdapter.getFilter().filter("", MainActivity.this);
+				} else {
+					mNoteAdapter.getFilter().filter(queryText, MainActivity.this);
+				}
+				return true;
+			}
+		});
 	}
 	
 	private void savePrevNote() {
-		if (mIsNoteEdited) {
-			updateNote(mEditingNote);
+		if (mEditingNote != null) {
+			if (mIsNoteEdited) {
+				updateNote(mEditingNote);
+			}
+			mEditingNote.setIsSelected(false);	
 		}
-		mEditingNote.setIsSelected(false);	
-	}
-	
-	private void setNewNote(SelectableNote newNote) {
-		mIsEditWithChangeNote = true;
-        mEditingNote = newNote;
-        mNoteEditText.setText(mEditingNote.getNote());
-		mEditingNote.setIsSelected(true);
-        mIsNoteEdited = false;
-        mIsEditWithChangeNote = false;
 	}
 	
 	private SelectableNote getNote(Cursor c) {
 		assert(c != null);
-		
 		SelectableNote note = new SelectableNote(
 				c.getInt(c.getColumnIndex(DBAdapter.COL_ID)), 
 				c.getString(c.getColumnIndex(DBAdapter.COL_NOTE)),
@@ -254,7 +256,6 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 		// Read
 		mDbAdapter.open();
 		Cursor c = mDbAdapter.getAllNotes();
-
 		if (c.moveToFirst()) {
 			do {
 				SelectableNote note = getNote(c);
@@ -268,18 +269,24 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 		SelectableNote note = null;
 		mDbAdapter.open();
 		int id = mDbAdapter.saveNote(notetext, user);
-		mDbAdapter.close();
-		System.err.println(id);
-		mDbAdapter.open();
 		Cursor c = mDbAdapter.getNote(id);
 		if (c.moveToFirst()) {
 			note = getNote(c);
 			mNoteAdapter.add(note);
 		}
+		mDbAdapter.close();
 		return note;
 	}
 	private SelectableNote createNewNote() {
-		return saveNote("", "user");
+		Account[] accounts = AccountManager.get(this).getAccounts();
+		String user = "noname";
+		if (accounts != null && accounts.length > 0) {
+			Account account = accounts[0];
+			if (account != null) {
+				user = account.name;
+			}
+		}
+		return saveNote("", user);
 	}
 	
 	private void updateNote(Note note) {
@@ -299,18 +306,24 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 		
 		SelectableNote newNote;
 		if (mNoteAdapter.getCount() == 0) {
-			setNoteEditable(false);
-			mIsEditWithChangeNote = true;
-			mNoteEditText.setText("");
-			mIsEditWithChangeNote = false;
+			deselectNote();
 		} else {
+			// 一つ上もしくは一つ下のノートを新しく選択中にする
 			if (position < mNoteAdapter.getCount()) {
 				newNote = mNoteAdapter.getItem(position);
 			} else {
 				newNote = mNoteAdapter.getItem(position - 1);
 			}
-			setNewNote(newNote);
+			selectNote(newNote);
 		}
+	}
+	
+	// プログラム側からのEditTextの書き換えで、Noteのlastupdateが更新されないようにする
+	// そのためのフラグ設定
+	private void setEditTextsText(CharSequence str) {
+		mIsEditWithChangeNote = true;
+		mNoteEditText.setText(str);
+		mIsEditWithChangeNote = false;
 	}
 	
 	private void refleshListView() {
@@ -322,7 +335,33 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 		mNoteEditText.setFocusable(isEditable);
 		mNoteEditText.setFocusableInTouchMode(isEditable);
 		mNoteEditText.setEnabled(isEditable);
-		mNoteEditText.requestFocus();
+	}
+	
+	private void selectNote(SelectableNote note) {
+		// 編集中のNoteの内容を保存します
+		savePrevNote();
+		// 新しいノートをEditTextなどにセットします
+        mEditingNote = note;
+		setEditTextsText(mEditingNote.getNote());
+		mEditingNote.setIsSelected(true);
+        mIsNoteEdited = false;
+        
+		mNoteEditText.setBackgroundColor(getResources().getColor(R.color.editable));
+        setNoteEditable(true);
+        refleshListView();
+	}
+	
+	private void deselectNote() {
+		// 編集中のNoteの内容を保存します
+		savePrevNote();
+		// EditTextなどをからにします
+		mEditingNote = null;
+		setEditTextsText("");
+		mIsNoteEdited = false;
+		
+		mNoteEditText.setBackgroundColor(getResources().getColor(R.color.uneditable));
+		setNoteEditable(false);
+        refleshListView();
 	}
 	
 
@@ -348,5 +387,13 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 			Log.d("DEBUG", "serialize fail");
 		}
 		return msg;
+	}
+	
+	@Override
+	public void onFilterComplete(int count) {
+		if (mNoteAdapter.getPosition(mEditingNote) < 0) {
+			// 選択中のアイテムが検索によってListViewからいなくなったら
+			deselectNote();
+		} 
 	}
 }
