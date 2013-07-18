@@ -37,9 +37,10 @@ public class DBAdapter {
 
 		@Override
 		public void onCreate(SQLiteDatabase db) {
-			db.execSQL("CREATE TABLE " + TABLE_NAME + " (" + COL_ID
-					+ " INTEGER PRIMARY KEY AUTOINCREMENT," + COL_NOTE
-					+ " TEXT NOT NULL," + COL_USER + " TEXT NOT NULL,"
+			db.execSQL("CREATE TABLE " + TABLE_NAME + " (" 
+					+ COL_ID + " INTEGER PRIMARY KEY AUTOINCREMENT," 
+					+ COL_NOTE + " TEXT NOT NULL," 
+					+ COL_USER + " TEXT NOT NULL,"
 					+ COL_LASTUPDATE + " TEXT NOT NULL);");
 		}
 
@@ -78,7 +79,6 @@ public class DBAdapter {
 	
 	public Cursor getNote(int id) {
 		String query = "select * from " + TABLE_NAME + " where " + COL_ID + "=" + id + ";";
-		System.err.println(query);
 		return db.rawQuery(query, null);
 	}
 
@@ -91,6 +91,7 @@ public class DBAdapter {
 		values.put(COL_NOTE, note);
 		values.put(COL_USER, user);
 		values.put(COL_LASTUPDATE, DateUtils.getDate());
+		// idを返す
 		return (int) db.insertOrThrow(TABLE_NAME, null, values);
 	}
 	

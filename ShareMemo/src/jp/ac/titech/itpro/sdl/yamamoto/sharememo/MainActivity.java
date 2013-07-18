@@ -25,6 +25,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteCursor;
+import android.graphics.drawable.Drawable;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
@@ -48,6 +49,7 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 	private ListView mItemListView;
 	private Button mAddButton;
 	private Button mDelButton;
+	private SearchView mSearchView;
 
 	private SelectableNote mEditingNote;
 	private boolean mIsNoteEdited;
@@ -57,6 +59,7 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 	private NoteAdapter mNoteAdapter;
 
 	private NfcAdapter mNfcAdapter;
+	private Drawable mUnEditableIcon;
 
 	
 	
@@ -89,6 +92,8 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 			mNfcAdapter.setNdefPushMessageCallback(this, this);
 			mNfcAdapter.setOnNdefPushCompleteCallback(this, this);
 		}
+		
+		// 
 	}
 
 	@Override
@@ -114,6 +119,7 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
             processIntent(getIntent());
         }
     }
+	// android beam を受け取った時の処理
 	private void processIntent(Intent intent) {
         Parcelable[] rawMsgs = intent.getParcelableArrayExtra(
                 NfcAdapter.EXTRA_NDEF_MESSAGES);
@@ -128,7 +134,7 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 	
 	        // データを取り出して保存、そのノートに切り替えます。
 	        SelectableNote newNote = (SelectableNote) ois.readObject();
-	        saveNote(newNote.getNote(), newNote.getUser());
+	        newNote = saveNote(newNote.getNote(), newNote.getUser());
 	        selectNote(newNote);
 	        
         } catch (Exception e) {
@@ -161,6 +167,11 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 					int count) {
 			}
 		});
+		
+		// 編集不可のときのiconを設定する
+		mUnEditableIcon = getResources().getDrawable(android.R.drawable.ic_delete);
+		mUnEditableIcon.setBounds(0, 0, 
+				mUnEditableIcon.getIntrinsicWidth(), mUnEditableIcon.getIntrinsicHeight());
 	}
 	
 	private void initListView() {
@@ -192,6 +203,10 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 				// ボタンが押されたら新しいノートを作成し、選択する
 				SelectableNote newNote = createNewNote();
 				selectNote(newNote);
+				mNoteEditText.requestFocus();
+				// 検索フィルタはリセットする
+				mSearchView.setQuery("", false);
+				
 			}
 		});
 	}
@@ -202,18 +217,20 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 			
 			@Override
 			public void onClick(View v) {
-				// ボタンが押されたら現在のノートを削除する
-				deleteNote(mEditingNote);
+				if (mEditingNote != null) {
+					// ボタンが押されたら現在のノートを削除する
+					deleteNote(mEditingNote);
+				}
 			}
 		});
 	}
 	
 	private void initSearch() {
 		// search window
-		SearchView search =	(SearchView) findViewById(R.id.search_window);
-		search.setIconified(false);	
-		search.setSubmitButtonEnabled(false);
-		search.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+		mSearchView = (SearchView) findViewById(R.id.search_window);
+		mSearchView.setIconified(false);	
+		mSearchView.setSubmitButtonEnabled(false);
+		mSearchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
 			@Override
 			public boolean onQueryTextSubmit(String query) {
 				Log.d("DEBUG", "test");
@@ -346,7 +363,7 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 		mEditingNote.setIsSelected(true);
         mIsNoteEdited = false;
         
-		mNoteEditText.setBackgroundColor(getResources().getColor(R.color.editable));
+		mNoteEditText.setCompoundDrawables(null, null, null, null);
         setNoteEditable(true);
         refleshListView();
 	}
@@ -359,7 +376,7 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 		setEditTextsText("");
 		mIsNoteEdited = false;
 		
-		mNoteEditText.setBackgroundColor(getResources().getColor(R.color.uneditable));
+		mNoteEditText.setCompoundDrawables(mUnEditableIcon, null, null, null);
 		setNoteEditable(false);
         refleshListView();
 	}
@@ -373,18 +390,20 @@ public class MainActivity extends Activity implements CreateNdefMessageCallback,
 	@Override
 	public NdefMessage createNdefMessage(NfcEvent event) {
 		NdefMessage msg = null;
-		byte[] data;
-		try { 
-			ByteArrayOutputStream bos = new ByteArrayOutputStream();
-		    ObjectOutputStream oos = new ObjectOutputStream(bos);
-		    oos.writeObject(mEditingNote);
-		    oos.flush();
-		    data = bos.toByteArray();
-		    
-			msg = new NdefMessage(NdefRecord.createMime(
-					"application/jp.ac.titech.itpro.sdl.yamamoto.sharememo", data));
-		} catch (Exception e) {
-			Log.d("DEBUG", "serialize fail");
+		if (mEditingNote != null) {
+			byte[] data;
+			try { 
+				ByteArrayOutputStream bos = new ByteArrayOutputStream();
+			    ObjectOutputStream oos = new ObjectOutputStream(bos);
+			    oos.writeObject(mEditingNote);
+			    oos.flush();
+			    data = bos.toByteArray();
+			    
+				msg = new NdefMessage(NdefRecord.createMime(
+						"application/jp.ac.titech.itpro.sdl.yamamoto.sharememo", data));
+			} catch (Exception e) {
+				Log.d("DEBUG", "serialize fail");
+			}
 		}
 		return msg;
 	}

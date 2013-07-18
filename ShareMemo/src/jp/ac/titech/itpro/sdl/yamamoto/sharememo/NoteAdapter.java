@@ -141,13 +141,4 @@ public class NoteAdapter extends ArrayAdapter<SelectableNote> {
     	super.sort(comparator);
     	Collections.sort(this.list, comparator);
     }
-    
-    public boolean contains(SelectableNote item) {
-    	for (int i=0; i<this.getCount(); i++) {
-    		if (item.equals(this.getItem(i))) {
-    			return true;
-    		}
-    	}
-    	return false;
-    }
 }
